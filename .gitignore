@@ -1,0 +1,30 @@
+# 数据文件（跨机器同步，已取消忽略 .txt）
+# data/*.txt
+data/*.pkl
+data/*.npy
+
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# 模型检查点
+*.ckpt
+*.pt
+*.pth
+checkpoints/
+
+# 系统文件
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+
+# 参考代码（用完删除）
+refs/
+
+# 日志
+*.log
+wandb/
+lightning_logs/

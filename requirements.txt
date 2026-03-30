@@ -1,0 +1,11 @@
+# PyTorch（根据你的系统选择合适版本：https://pytorch.org/get-started/locally/）
+torch>=2.1.0
+# torchvision  # 本项目不需要
+
+# 科学计算
+numpy>=1.24.0
+scipy>=1.10.0
+matplotlib>=3.7.0
+
+# 工具
+tqdm>=4.60.0
