@@ -94,7 +94,7 @@ Requires Python ≥ 3.9, PyTorch ≥ 2.0, PyTorch Geometric.
 
 ## Data
 
-Pre-generated data is in `data/`. To regenerate:
+Pre-generated data is included in `data/`. To regenerate:
 
 ```bash
 python data/generate_tsp_data.py --n 50 --num_samples 50000 --split train
@@ -105,60 +105,116 @@ python data/generate_tsp_data.py --n 50 --num_samples 1000  --split test
 
 ## Training
 
+Checkpoints are saved automatically to `checkpoints/<mode>_<encoder_type>/` (e.g. `checkpoints/discrete_ddpm_gated_gcn/`). Best validation checkpoint is `best.pt`.
+
 ```bash
 # Discrete DDPM (D3PM)
-python train.py --mode discrete_ddpm   --n_nodes 50 --hidden_dim 256 --n_layers 12
+python train.py --mode discrete_ddpm --data_file data/tsp50_train.txt
 
 # Flow Matching
-python train.py --mode flow_matching   --n_nodes 50 --hidden_dim 256 --n_layers 12
+python train.py --mode flow_matching --data_file data/tsp50_train.txt
 
 # Continuous DDPM
-python train.py --mode continuous_ddpm --n_nodes 50 --hidden_dim 256 --n_layers 12
+python train.py --mode continuous_ddpm --data_file data/tsp50_train.txt
 ```
 
-Checkpoints are saved to `checkpoints/<run_name>/`. Training history (train/val loss per epoch) is saved as `history.json`.
+Key training options:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--mode` | `flow_matching` | `discrete_ddpm` / `continuous_ddpm` / `flow_matching` |
+| `--data_file` | `data/tsp20_train.txt` | Path to training data |
+| `--epochs` | `50` | Number of training epochs |
+| `--batch_size` | `64` | Batch size (use 32 for TSP-100) |
+| `--hidden_dim` | `256` | GNN hidden dimension |
+| `--n_layers` | `12` | Number of GNN layers |
+| `--encoder_type` | `gated_gcn` | `gated_gcn` / `gat` / `simple_gcn` |
+| `--resume` | — | Path to checkpoint to resume from |
 
 ---
 
 ## Evaluation
 
-```bash
-# Single sample, merge+2opt
-python evaluate.py \
-    --mode discrete_ddpm \
-    --checkpoint checkpoints/discrete_ddpm_gated_gcn/best.pt \
-    --decode_strategy merge2opt \
-    --n_samples 1
+Both `--checkpoint` and `--data_file` are required.
 
-# Multi-sample (best-of-16)
+```bash
+# D3PM — merge_tours + 2-opt (single sample)
 python evaluate.py \
-    --mode discrete_ddpm \
     --checkpoint checkpoints/discrete_ddpm_gated_gcn/best.pt \
-    --decode_strategy merge2opt \
+    --data_file data/tsp50_test.txt \
+    --decode merge --use_2opt
+
+# Flow Matching — merge_tours + 2-opt (single sample)
+python evaluate.py \
+    --checkpoint checkpoints/flow_matching_gated_gcn/best.pt \
+    --data_file data/tsp50_test.txt \
+    --decode merge --use_2opt
+
+# Continuous DDPM — merge_tours + 2-opt (single sample)
+python evaluate.py \
+    --checkpoint checkpoints/continuous_ddpm_gated_gcn/best.pt \
+    --data_file data/tsp50_test.txt \
+    --decode merge --use_2opt
+```
+
+Multi-sample inference (best-of-N):
+
+```bash
+python evaluate.py \
+    --checkpoint checkpoints/discrete_ddpm_gated_gcn/best.pt \
+    --data_file data/tsp50_test.txt \
+    --decode merge --use_2opt \
     --n_samples 16
 ```
+
+Key evaluation options:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--checkpoint` | required | Path to `.pt` checkpoint |
+| `--data_file` | required | Path to test data |
+| `--decode` | `merge` | `greedy` / `beam` / `merge` |
+| `--use_2opt` | off | Enable 2-opt post-processing |
+| `--beam_k` | `5` | Beam width (only for `--decode beam`) |
+| `--n_samples` | `1` | Number of samples; best tour is kept |
+| `--inference_steps` | auto | Override default steps (FM=20, D3PM/DDPM=50) |
+| `--save_result` | — | Save JSON result to this path |
 
 ---
 
 ## Visualization
 
+Checkpoints are loaded from the default paths (`checkpoints/<mode>_gated_gcn/best.pt`). Use `--mode` to select one model; omit to run all three.
+
 ```bash
-# Generate diffusion GIF (edge heatmap evolving across steps)
-python visualize_diffusion.py \
-    --mode flow_matching \
-    --checkpoint checkpoints/flow_matching_gated_gcn/best.pt \
-    --output assets/diffusion_fm.gif
+# GIF + heatmap evolution for all three models
+python visualize_diffusion.py --data_file data/tsp50_test.txt
 
-# Heatmap evolution grid
-python visualize_diffusion.py \
-    --mode discrete_ddpm \
-    --plot_type heatmap_evolution
+# One model only
+python visualize_diffusion.py --mode discrete_ddpm --data_file data/tsp50_test.txt
 
-# Tour comparison (our solution vs optimal)
-python visualize_diffusion.py \
-    --mode discrete_ddpm \
-    --plot_type tour_comparison
+# Choose which instance to visualize (0-indexed)
+python visualize_diffusion.py --mode flow_matching --instance_idx 5
+
+# Custom output directory
+python visualize_diffusion.py --out_dir my_figs
 ```
+
+Key visualization options:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--mode` | all | `discrete_ddpm` / `continuous_ddpm` / `flow_matching` |
+| `--data_file` | `data/tsp50_test.txt` | Test data file |
+| `--instance_idx` | `0` | Which test instance to visualize |
+| `--out_dir` | `report/figs` | Output directory for GIFs and figures |
+| `--gif_steps` | auto | Override inference steps for GIF |
+| `--n_samples` | `8` | Samples for best-of-N tour comparison figure |
+
+Outputs written to `--out_dir`:
+- `diffusion_{fm,d3pm,ddpm}.gif` — denoising animation
+- `heatmap_evolution_{fm,d3pm,ddpm}.png` — 6-frame snapshot grid
+- `tour_comparison.png` — model predictions vs optimal tours
 
 ---
 
